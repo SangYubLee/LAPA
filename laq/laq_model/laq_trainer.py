@@ -243,7 +243,7 @@ class LAQTrainer(nn.Module):
             img = img.to(device)
 
             # with self.accelerator.autocast():
-            loss, num_unique_indices = self.vae(
+            loss, num_unique_indices, perplexity = self.vae(
                 img,
                 step=steps,
             )
@@ -252,6 +252,7 @@ class LAQTrainer(nn.Module):
 
             accum_log(logs, {'loss': loss.item() / self.grad_accum_every})
             accum_log(logs, {'num_unique_indices': num_unique_indices})
+            accum_log(logs, {'perplexity': perplexity})
 
         if exists(self.max_grad_norm):
             self.accelerator.clip_grad_norm_(self.vae.parameters(), self.max_grad_norm)

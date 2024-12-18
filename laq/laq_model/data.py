@@ -56,7 +56,7 @@ class ImageVideoDataset(Dataset):
             folder = self.folder_list[index]
             img_list = os.listdir(os.path.join(self.folder, folder))
 
-            img_list = sorted(img_list, key=lambda x: int(x.split('.')[0][4:]))
+            img_list = sorted(img_list, key=lambda x: int(x.split('.')[0].split('_')[1]))
             ## pick random frame 
             first_frame_idx = random.randint(0, len(img_list)-1)
             first_frame_idx = min(first_frame_idx, len(img_list)-1)

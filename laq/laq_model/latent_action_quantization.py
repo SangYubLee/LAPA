@@ -282,7 +282,7 @@ class LatentActionQuantization(nn.Module):
         else:
             recon_loss = F.mse_loss(video, recon_video)
 
-        return recon_loss, num_unique_indices
+        return recon_loss, num_unique_indices, perplexity
         
 
     def inference(
