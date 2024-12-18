@@ -65,7 +65,7 @@ class LatentActionQuantization(nn.Module):
             nn.LayerNorm(channels * patch_width * patch_height),
             nn.Linear(channels * patch_width * patch_height, dim),
             nn.LayerNorm(dim)
-        )
+        ) # (B, 1, patch_height_num, patch_width_num, dim)
 
 
         transformer_kwargs = dict(
@@ -94,7 +94,7 @@ class LatentActionQuantization(nn.Module):
         self.enc_temporal_transformer = Transformer(depth = temporal_depth, **transformer_kwargs)
 
 
-        self.vq = NSVQ(
+        self.vq = NSVQ( # codebook: (32, 8)
             dim=dim,
             num_embeddings=codebook_size,
             embedding_dim=quant_dim,
@@ -136,7 +136,7 @@ class LatentActionQuantization(nn.Module):
 
     def encode(
         self,
-        tokens
+        tokens  # (B, T(frame), H, W, D), (64, 2, 8, 8, 1024)
     ):
         b = tokens.shape[0]
         h, w = self.patch_height_width
@@ -161,14 +161,14 @@ class LatentActionQuantization(nn.Module):
         first_tokens = tokens[:, :1]
         last_tokens = tokens[:, 1:]
         
-        return first_tokens, last_tokens
+        return first_tokens, last_tokens    # (64, 1, 8, 8, 1024), (64, 1, 8, 8, 1024)
 
         
 
     def decode(
         self,
-        tokens,
-        actions,
+        tokens, # (B, T, patch_h, patch_w, D) : (64, 1, 8, 8, 1024)
+        actions, # (B, T, sqrt(code_seq_len), sqrt(code_seq_len), D) : (64, 1, 2, 2, 1024)
     ):
         b = tokens.shape[0]
         h, w = self.patch_height_width
@@ -187,18 +187,18 @@ class LatentActionQuantization(nn.Module):
         tokens = self.dec_spatial_transformer(tokens, attn_bias = attn_bias, video_shape = video_shape, context=actions)
         
 
-        tokens = rearrange(tokens, '(b t) (h w) d -> b t h w d', b = b, h = h , w = w)
+        tokens = rearrange(tokens, '(b t) (h w) d -> b t h w d', b = b, h = h , w = w)  # (64, 1, 8, 8, 1024)
 
         rest_frames_tokens = tokens
 
         recon_video = self.to_pixels_first_frame(rest_frames_tokens)
 
-        return recon_video
+        return recon_video   # (64, 3, 1, 256, 256)
     
 
     def forward(
         self,
-        video,
+        video,  # (B, C, F, H, W), (64, 3, 2, 256, 256)
         step = 0,
         mask = None,
         return_recons_only = False,
@@ -220,16 +220,16 @@ class LatentActionQuantization(nn.Module):
         first_frame, rest_frames = video[:, :, :1], video[:, :, 1:]
 
 
-        first_frame_tokens = self.to_patch_emb_first_frame(first_frame)
+        first_frame_tokens = self.to_patch_emb_first_frame(first_frame) # (B, 1, h, w, dim), (64, 1, 8, 8, 1024)
         rest_frames_tokens = self.to_patch_emb_first_frame(rest_frames)
-        tokens = torch.cat((first_frame_tokens, rest_frames_tokens), dim = 1)
+        tokens = torch.cat((first_frame_tokens, rest_frames_tokens), dim = 1)    # (64, 2, 8, 8, 1024)
 
         shape = tokens.shape
         *_, h, w, _ = shape
 
         first_tokens, last_tokens = self.encode(tokens)
 
-        first_tokens, first_packed_fhw_shape = pack([first_tokens], 'b * d')
+        first_tokens, first_packed_fhw_shape = pack([first_tokens], 'b * d')    # (64, (1, 8, 8), 1024) -> (64, 64, 1024)
         last_tokens, last_packed_fhw_shape = pack([last_tokens], 'b * d')
         
 
@@ -241,14 +241,18 @@ class LatentActionQuantization(nn.Module):
 
         
         tokens, perplexity, codebook_usage, indices = self.vq(first_tokens, last_tokens, codebook_training_only = False)
-        
-        num_unique_indices = indices.unique().size(0)
+        # tokens: (B, code_seq_len, D) : (64, 4, 1024)
+        # perplexity: exp(entropy(codebook_usage))
+        # codebook_usage: (num_embeddings)
+        # indices: (B, code_seq_len) : (64, 4)
+
+        num_unique_indices = indices.unique().size(0)   # num_embeddings 과 같으면 모든 코드북이 사용된 것
         
 
         
         if ((step % 100 == 1 and step < 1000) or (step % 500 == 1 and step < 5000)) and step != 0: ## todo: after finishing the training, don't change the codebook
             print(f"update codebook {step}")
-            self.vq.replace_unused_codebooks(224*4)
+            self.vq.replace_unused_codebooks(224*4) # (224 * 4) : 교체 주기
 
         if return_only_codebook_ids:
             return indices
@@ -264,9 +268,9 @@ class LatentActionQuantization(nn.Module):
             print("code_seq_len should be square number or defined as 2")
             return
         
-        tokens = rearrange(tokens, 'b (t h w) d -> b t h w d', h = action_h, w = action_w)
-        concat_tokens = first_frame_tokens.detach() # + tokens
-        recon_video = self.decode(concat_tokens, tokens)
+        tokens = rearrange(tokens, 'b (t h w) d -> b t h w d', h = action_h, w = action_w)  # (64, 1, 2, 2, 1024)
+        concat_tokens = first_frame_tokens.detach() # + tokens  # (64, 1, 8, 8, 1024)
+        recon_video = self.decode(concat_tokens, tokens)    # (64, 3, 1, 256, 256)
 
         returned_recon = rearrange(recon_video, 'b c 1 h w -> b c h w')
         video = rest_frames 

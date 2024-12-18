@@ -276,12 +276,12 @@ class LAQTrainer(nn.Module):
             for model, filename in vaes_to_evaluate:
                 model.eval()
 
-                valid_data = next(self.valid_dl_iter)
+                valid_data = next(self.valid_dl_iter)   # (B, C, T, H, W)
 
 
                 valid_data = valid_data.to(device)
 
-                recons = model(valid_data, return_recons_only = True)
+                recons = model(valid_data, return_recons_only = True)   # (B, C, H, W)
 
 
                 if self.train_on_images:

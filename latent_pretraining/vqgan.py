@@ -109,22 +109,26 @@ class VQGANModel(nn.Module):
         self.encoder = Encoder(self.config)
         self.decoder = Decoder(self.config)
         self.quantize = VectorQuantizer(
-            self.config.num_embeddings, self.config.quantized_embed_dim
+            self.config.num_embeddings, self.config.quantized_embed_dim # 8192, 64
         )
         self.quant_conv = nn.Conv(self.config.quantized_embed_dim, [1, 1])
         self.post_quant_conv = nn.Conv(self.config.z_channels, [1, 1])
     
-    def encode(self, pixel_values):
+    def encode(self, pixel_values): # (1, 256, 256, 3)
         T = None
         if len(pixel_values.shape) == 5: # video
             T = pixel_values.shape[1]
             pixel_values = pixel_values.reshape(-1, *pixel_values.shape[2:])
-        hidden_states = self.encoder(pixel_values)
-        hidden_states = self.quant_conv(hidden_states)
-        quantized_states, codebook_indices = self.quantize(hidden_states)
+        hidden_states = self.encoder(pixel_values)  # (1, 16, 16, 64)
+        hidden_states = self.quant_conv(hidden_states)  # (1, 16, 16, 64)
+        
+        quantized_states, codebook_indices = self.quantize(hidden_states)  # (1, 16, 16, 64), (1, 16, 16)
+        
         if T is not None:
             quantized_states = quantized_states.reshape(-1, T, *quantized_states.shape[1:])
             codebook_indices = codebook_indices.reshape(-1, T, *codebook_indices.shape[1:])
+        # codebook indices [1, 16, 16] # [인코딩된 이미지개수, h, w]
+        # quantized state [1, 16, 16, 64] # [각 각 코드]
         return quantized_states, codebook_indices
 
     def decode(self, encoding, is_codebook_indices=True):

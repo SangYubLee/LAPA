@@ -89,27 +89,35 @@ class NSVQ(torch.nn.Module):
         else:
             raise ValueError("Not Implement: code_seq_len should be one of the 1 and 4 integers")
 
-    def encode(self, input_data, batch_size):
+    def encode(self, input_data, batch_size):   # (B, (T*H*W), D) : (64, 64, 1024), batch_size: 64
+        '''
+        input_data: (B, (T*H*W), D) : (64, 64, 1024)
+        return: (B*code_seq_len, embedding_dim) : (256, 32)
+        '''
         # compute the distances between input and codebooks vectors
         input_data = self.project_in(input_data) # b * 64 * 32
         # change the order of the input_data to b * 32 * 64
         input_data = input_data.permute(0, 2, 1).contiguous()
         # reshape input_data to 4D b*h*w*d
-        input_data = input_data.reshape(batch_size, self.embedding_dim, int(self.image_size/self.patch_size), int(self.image_size/self.patch_size))
-        input_data = self.cnn_encoder(input_data) # 1*1 tensor
-        input_data = input_data.reshape(batch_size, self.embedding_dim, -1) # b * 32 * d^2
-        input_data = input_data.permute(0, 2, 1).contiguous() # b * 1 * 32
-        input_data = input_data.reshape(-1, self.embedding_dim)
-        return input_data
+        input_data = input_data.reshape(batch_size, self.embedding_dim, int(self.image_size/self.patch_size), int(self.image_size/self.patch_size)) # (B, D, H, W) : (64, 32, 8, 8)
+        input_data = self.cnn_encoder(input_data) # 1*1 tensor (B, D, H, W) : (64, 32, 2, 2)
+        input_data = input_data.reshape(batch_size, self.embedding_dim, -1) # b * 32 * d^2      (64, 32, 4)
+        input_data = input_data.permute(0, 2, 1).contiguous() # b * 1 * 32      (64, 4, 32): (B, code_seq_len, D)
+        input_data = input_data.reshape(-1, self.embedding_dim) # (256, 32): (B*code_seq_len, D)
+        return input_data 
     
     def decode(self, quantized_input, batch_size):
+        '''
+        quantized_input: (B*code_seq_len, embedding_dim) : (256, 32)
+        return: (B, code_seq_len, D) : (64, 4, 1024)
+        '''
         quantized_input = quantized_input.reshape(batch_size, self.embedding_dim, -1) # b * 32 * d^2
         quantized_input = quantized_input.permute(0, 2, 1).contiguous() # b * 64 * 32
         
         quantized_input = self.project_out(quantized_input)
         return quantized_input
     
-    def forward(self, input_data_first, input_data_last, codebook_training_only=False):
+    def forward(self, input_data_first, input_data_last, codebook_training_only=False): # (64, 64, 1024), (64, 64, 1024) : (B, (T*H*W), D)
 
         """
         This function performs the main proposed vector quantization function using NSVQ trick to pass the gradients.
@@ -132,15 +140,15 @@ class NSVQ(torch.nn.Module):
         input_data_first = self.encode(input_data_first, batch_size) # b * 1 * 32
         input_data_last = self.encode(input_data_last, batch_size) # b * 1 * 32
         
-        input_data = input_data_last - input_data_first
+        input_data = input_data_last - input_data_first # (256, 32) : (B*code_seq_len, embedding_dim)
            
         distances = (torch.sum(input_data ** 2, dim=1, keepdim=True)
                      - 2 * (torch.matmul(input_data, self.codebooks.t()))
-                     + torch.sum(self.codebooks.t() ** 2, dim=0, keepdim=True))
+                     + torch.sum(self.codebooks.t() ** 2, dim=0, keepdim=True)) # (256, 8) : (B*code_seq_len, num_embeddings)
 
-        min_indices = torch.argmin(distances, dim=1)
+        min_indices = torch.argmin(distances, dim=1)    # (B*code_seq_len)
                 
-        hard_quantized_input = self.codebooks[min_indices]
+        hard_quantized_input = self.codebooks[min_indices]  # (256, 32) : (B*code_seq_len, embedding_dim)
         
         random_vector = normal_dist.Normal(0, 1).sample(input_data.shape).to(self.device)
 
@@ -154,13 +162,13 @@ class NSVQ(torch.nn.Module):
             print(f"codebook error: {norm_quantization_residual.norm()}")
             quantized_input = hard_quantized_input
         else:
-            quantized_input = input_data + vq_error
+            quantized_input = input_data + vq_error # (256, 32) : (B*code_seq_len, embedding_dim)
 
         # claculating the perplexity (average usage of codebook entries)
         encodings = torch.zeros(input_data.shape[0], self.num_embeddings, device=input_data.device)
         encodings.scatter_(1, min_indices.reshape([-1, 1]), 1)
         avg_probs = torch.mean(encodings, dim=0)
-        perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + self.eps)))
+        perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + self.eps)))     # exp(entropy)
 
         with torch.no_grad():
             min_indices_cpu = min_indices.cpu()
@@ -174,7 +182,7 @@ class NSVQ(torch.nn.Module):
         quantized_input = self.decode(quantized_input, batch_size)
         return quantized_input, perplexity, self.codebooks_used.cpu().numpy(), min_indices.reshape(batch_size, -1)
 
-    def replace_unused_codebooks(self, num_batches):
+    def replace_unused_codebooks(self, num_batches):    # 224 * 4
 
         """
         This function is used to replace the inactive codebook entries with the active ones, to make all codebooks

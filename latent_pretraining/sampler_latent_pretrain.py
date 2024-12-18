@@ -56,7 +56,7 @@ class DeltaSampler:
 
     def _read_process_vision(self, images):
 
-        vision = self._process_frame(images)
+        vision = self._process_frame(images)    # (1, 256, 256, 3)
         
         B = 1
         encodings = []
@@ -66,24 +66,26 @@ class DeltaSampler:
                 n_pad = 0
             else:
                 n_pad = B - len(v) % B
-            v = np.pad(v, ((n_pad, 0), (0, 0), (0, 0), (0, 0)))
-            enc = jax.device_get(self.vqgan.encode(v))[1].astype(int)
+            v = np.pad(v, ((n_pad, 0), (0, 0), (0, 0), (0, 0)))  # (1, 256, 256, 3)
+            # 여기서 가져오는 것은 (1, 16, 16) 개 의 codebook indices
+            enc = jax.device_get(self.vqgan.encode(v))[1].astype(int)   # (1, 16, 16)
             enc = enc[n_pad:]
             for t in range(len(enc)):
                 encodings.extend(enc[t].reshape(-1).tolist())
-        return encodings
+        return encodings    # List(256)
 
 
 
     def construct_input(self, prompts):
         for i, prompt in enumerate(prompts):
-            vision = self._read_process_vision(prompt['image'])
+            vision = self._read_process_vision(prompt['image'])  # List(256)
             tokens, vm = [], []
             tokens.extend(vision)
             vm.extend([True] * len(vision))
-            tokens.extend([8193])
-            vm.extend([True] * len([8193]))
+            tokens.extend([8193])   # List(257)
+            vm.extend([True] * len([8193]))  # List(257)
         return {
+            # Batch 차원을 추가하여 반환
             'input_ids': np.expand_dims(tokens, axis=0),
         }
              
@@ -151,7 +153,7 @@ class DeltaSampler:
 
 
             self.model.config.sample_mode='delta'
-            text_output = self.model.generate(
+            text_output = self.model.generate(  # (1, 395)
                 batch['input_ids'],
                 vision_masks=batch['vision_masks'],
                 attention_mask=batch['attention_mask'],
@@ -165,7 +167,7 @@ class DeltaSampler:
                     eos_token_id=self.tokenizer.eos_token_id,
                 )
             ).sequences
-            delta_output= text_output[:,batch['input_ids'].shape[1]:]
+            delta_output= text_output[:,batch['input_ids'].shape[1]:]    # [:, 391:]
             return delta_output, rng_generator()
         return pjit(
             fn,
@@ -184,15 +186,16 @@ class DeltaSampler:
             truncation=True,
             max_length=max_input_length,
             return_tensors='np'
-        )
+        )   # inputs : {'input_ids': (1, 128), 'attention_mask': (1, 128)}
         prefix_for_gen = ["</vision> <delta>"] * len(prompts)
         inputs_for_gen = self.prefix_tokenizer(
             prefix_for_gen,
             return_tensors='np'
-        )
+        )    # inputs_for_gen : {'input_ids': (1, 6), 'attention_mask': (1, 6)}
 
+        # Input : Text Tokens + Vision Tokens(VQVAE 기반) + </vision> <delta>
         batch = dict(
-            input_ids=np.concatenate([inputs.input_ids, images, inputs_for_gen.input_ids], axis=1),
+            input_ids=np.concatenate([inputs.input_ids, images, inputs_for_gen.input_ids], axis=1),     # (1, 128+257+6)
             attention_mask=np.concatenate([inputs.attention_mask, np.ones(images.shape, dtype=inputs.attention_mask.dtype), inputs_for_gen.attention_mask], axis=1),
             vision_masks=np.concatenate([
                 np.zeros(inputs.input_ids.shape, dtype=bool),
@@ -204,11 +207,12 @@ class DeltaSampler:
                 np.zeros(images.shape, dtype=bool),
                 np.zeros(inputs_for_gen.input_ids.shape, dtype=bool),
             ], axis=1),
-        )
+        )    # batch : {'input_ids': (1, 391), 'attention_mask': (1, 391), 'vision_masks': (1, 391), 'delta_masks': (1, 391)}
 
         with self.mesh:
             delta_output, sharded_rng = self._forward_generate(
                 self.params, sharded_rng, batch, 
+                # 생성할 Delta Token 수
                 self.FLAGS.tokens_per_delta
             )
             delta_output = jax.device_get(delta_output)
@@ -216,7 +220,7 @@ class DeltaSampler:
         return delta_output,
 
     def __call__(self, prompts):
-        batch = self.construct_input(prompts)
+        batch = self.construct_input(prompts) # Image Quantized Token Batches, (1, 257)
         text_prompt = f"<s> <s> You are a helpful assistant. USER: What action should the robot take to `{prompts[0]['question']}` ASSISTANT: <vision>"
         latent_output = self.generate_video_pred(prompts=[text_prompt], images=batch['input_ids'], max_input_length=128)
         return latent_output
