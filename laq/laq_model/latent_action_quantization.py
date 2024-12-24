@@ -332,8 +332,8 @@ class LatentActionQuantization(nn.Module):
         else:
             tokens, indices = self.vq.inference(first_tokens, last_tokens)
 
+        print(indices)
         
-    
         if return_only_codebook_ids:
             return indices
 
