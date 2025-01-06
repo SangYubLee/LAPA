@@ -27,7 +27,7 @@ VIDEO_LLAMA_STANDARD_CONFIGS = LLAMA_STANDARD_CONFIGS
 class VideoLLaMAConfig(LLaMAConfig):
     model_type = "video_llama"
 
-    def __init__(self, vision_vocab_size=8448, tie_vision_embeddings=False, delta_vocab_size=32, action_vocab_size=245, sample_mode='all', **kwargs):
+    def __init__(self, vision_vocab_size=8448, tie_vision_embeddings=False, delta_vocab_size=8, action_vocab_size=245, sample_mode='all', **kwargs):
         super().__init__(**kwargs)
         self.vision_vocab_size = vision_vocab_size # 8192 + 256
         self.tie_vision_embeddings = tie_vision_embeddings

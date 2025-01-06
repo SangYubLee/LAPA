@@ -41,8 +41,8 @@ class LAPAInference:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LAPA Inference script")
     parser.add_argument('--tokens_per_delta', type=int, default=4, help='Tokens per delta')
-    parser.add_argument('--vqgan_checkpoint', type=str, default="/home/work/open_x_dataset/LAPA/lapa_checkpoints/vqgan")
-    parser.add_argument('--vocab_file', type=str, default="/home/work/open_x_dataset/LAPA/lapa_checkpoints/tokenizer.model")
+    parser.add_argument('--vqgan_checkpoint', type=str, default="/media/hdd/sangyub/data/lapa/lapa_checkpoints/vqgan")
+    parser.add_argument('--vocab_file', type=str, default="/media/hdd/sangyub/data/lapa/lapa_checkpoints/tokenizer.model")
     parser.add_argument('--multi_image', type=int, default=1)
     parser.add_argument('--jax_distributed', type=dict, default=JaxDistributedConfig.get_default_config())
     parser.add_argument('--seed', type=int, default=1234)
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     parser.add_argument('--dtype', type=str, default="bf16")
     parser.add_argument('--load_llama_config', type=str, default="7b")
     parser.add_argument('--update_llama_config', type=str, default="dict(delta_vocab_size=8,sample_mode='text',theta=50000000,max_sequence_length=32768,scan_attention=False,scan_query_chunk_size=128,scan_key_chunk_size=128,scan_mlp=False,scan_mlp_chunk_size=8192,scan_layers=True)")
-    parser.add_argument('--load_checkpoint', type=str, default="params::/home/work/open_x_dataset/LAPA/lapa_checkpoints/params")
+    parser.add_argument('--load_checkpoint', type=str, default="params::/media/hdd/sangyub/data/lapa/lapa_checkpoints/params")
     parser.add_argument('--codebook_size', type=int, default=8)
 
 

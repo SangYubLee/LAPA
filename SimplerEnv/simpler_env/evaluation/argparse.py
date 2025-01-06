@@ -58,7 +58,7 @@ def get_args():
     )
     parser.add_argument("--action-scale", type=float, default=1.0)
     parser.add_argument("--action-scale-file", type=str, default=None)
-    parser.add_argument("--vqgan-checkpoint", type=str, default="../lapa_checkpoints/vqgan")
+    parser.add_argument("--vqgan-checkpoint", type=str, default="/media/hdd/sangyub/data/lapa/lapa_checkpoints/vqgan")
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--mesh-dim", type=str, default="1,-1,1,1")
     parser.add_argument("--dtype", type=str, default="bf16")
