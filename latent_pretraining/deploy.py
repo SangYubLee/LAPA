@@ -148,7 +148,7 @@ class DeployConfig:
     # Server Configuration
     host: str = "0.0.0.0"                                               # Host IP Address
     port: int = 32820                                                    # Host Port
-    vqgan_checkpoint: str = "lapa_checkpoints/vqgan"
+    vqgan_checkpoint: str = "/home/work/open_x_dataset/LAPA/lapa_checkpoints/vqgan"
     seed: int = 1234
     mesh_dim: str = "1,-1,1,1"
     dtype: str = "bf16"
@@ -156,7 +156,7 @@ class DeployConfig:
     update_llama_config: str = "dict(action_vocab_size=256,delta_vocab_size=8,sample_mode='text',theta=50000000,max_sequence_length=32768,scan_attention=False,scan_query_chunk_size=128,scan_key_chunk_size=128,scan_mlp=False,scan_mlp_chunk_size=8192,scan_layers=True)" 
     tokens_per_delta: int = 4
     tokens_per_action: int = 7
-    vocab_file: str = "lapa_checkpoints/tokenizer.model"
+    vocab_file: str = "/home/work/open_x_dataset/LAPA/lapa_checkpoints/tokenizer.model"
     multi_image: int = 1
     image_aug: int = 1
     jax_distributed: dict = JaxDistributedConfig.get_default_config()
