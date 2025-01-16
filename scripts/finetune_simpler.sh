@@ -4,8 +4,11 @@ cd $PROJECT_DIR
 export PYTHONPATH="$PYTHONPATH:$PROJECT_DIR"
 export LIBTPU_INIT_ARGS="--xla_tpu_megacore_fusion_allow_ags=false --xla_enable_async_collective_permute=true --xla_tpu_enable_ag_backward_pipelining=true --xla_tpu_enable_data_parallel_all_reduce_opt=true --xla_tpu_data_parallel_opt_different_sized_ops=true --xla_tpu_enable_async_collective_fusion=true --xla_tpu_enable_async_collective_fusion_multiple_steps=true --xla_tpu_overlap_compute_collective_tc=true --xla_enable_async_all_gather=true"
 
-export absolute_path="/home/sangyub/Workspace/LAPA" # absolute path to the project directory
-export data_path="/media/hdd/sangyub/data/lapa"
+# export absolute_path="/home/sangyub/Workspace/LAPA" # absolute path to the project directory
+export absolute_path="/home/work/open_x_dataset/sangyub/LAPA" # absolute path to the project directory
+# export data_path="/media/hdd/sangyub/data/lapa"
+export data_path="/home/work/open_x_dataset/LAPA"
+
 export llama_tokenizer_path="$data_path/lapa_checkpoints/tokenizer.model"
 export output_dir="$absolute_path/outputs"
 
@@ -13,13 +16,18 @@ export project_id='lapa'
 export experiment_note='lapa_finetune'
 
 export dataset_path="$absolute_path/data/simpler.jsonl"
-export experiment_id='finetune_simpler'
+export experiment_id='finetune_simpler_temp'
 
-export XLA_PYTHON_CLIENT_MEM_FRACTION=0.95
+export XLA_PYTHON_CLIENT_MEM_FRACTION=0.9
+# export XLA_PYTHON_CLIENT_PREALLOCATE="false"
+# export JAX_DISABLE_JIT=1
+# export JAX_DEBUG_NANS=1
+
+# export JAX_SKIP_CUDA_CONSTRAINTS_CHECK=true
 
 python3 -u -m latent_pretraining.train \
     --modality='vision,action,delta' \
-    --mesh_dim='!-1,2,1,1' \
+    --mesh_dim='!-1,4,1,1' \
     --dtype='bf16' \
     --total_steps=500 \
     --log_freq=1 \
@@ -50,10 +58,10 @@ python3 -u -m latent_pretraining.train \
     --train_dataset.json_delta_action_dataset.mode="pad" \
     --train_dataset.json_delta_action_dataset.path="$dataset_path" \
     --train_dataset.json_delta_action_dataset.seq_length=384 \
-    --train_dataset.json_delta_action_dataset.batch_size=2 \
+    --train_dataset.json_delta_action_dataset.batch_size=4 \
     --train_dataset.json_delta_action_dataset.tokenizer_processes=1 \
-    --train_dataset.json_delta_action_dataset.tokenizer_parallel_chunk_size=1 \
-    --train_dataset.json_delta_action_dataset.tokenizer_parallel_batch_size=1 \
+    --train_dataset.json_delta_action_dataset.tokenizer_parallel_chunk_size=4 \
+    --train_dataset.json_delta_action_dataset.tokenizer_parallel_batch_size=4 \
     --train_dataset.json_delta_action_dataset.use_data_sharded_loader=True \
     --checkpointer.save_optimizer_state=False \
     --autoresume=False \

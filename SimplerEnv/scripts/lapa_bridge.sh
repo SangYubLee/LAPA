@@ -1,4 +1,4 @@
-gpu_id=6
+gpu_id=0
 declare -a policy_models=(
   "lapa"
 )
@@ -11,7 +11,8 @@ robot_init_y=0.028
 
 
 
-ckpt_path="params::/media/hdd/sangyub/data/lapa/lapa_checkpoints/params"
+# ckpt_path="params::/home/work/open_x_dataset/LAPA/lapa_checkpoints/params"
+ckpt_path="params::/home/work/open_x_dataset/sangyub/LAPA/outputs/finetune_simpler_temp/streaming_params"
 
 for policy_model in "${policy_models[@]}"; do
 CUDA_VISIBLE_DEVICES=${gpu_id} python simpler_env/main_inference_lapa.py --policy-model ${policy_model} --ckpt-path ${ckpt_path} \
@@ -22,7 +23,7 @@ CUDA_VISIBLE_DEVICES=${gpu_id} python simpler_env/main_inference_lapa.py --polic
     --robot-init-x ${robot_init_x} ${robot_init_x} 1 --robot-init-y ${robot_init_y} ${robot_init_y} 1 --obj-variation-mode episode --obj-episode-range 0 24\
     --robot-init-rot-quat-center 0 0 0 1 --robot-init-rot-rpy-range 0 0 1 0 0 1 0 0 1 \
     --load-llama-config 7b --update-llama-config "dict(action_vocab_size=245,sample_mode='text',theta=50000000,max_sequence_length=32768,scan_attention=False,scan_query_chunk_size=128,scan_key_chunk_size=128,scan_mlp=False,scan_mlp_chunk_size=8192,scan_layers=True)" \
-    --vocab-file /media/hdd/sangyub/data/lapa/lapa_checkpoints/tokenizer.model \
+    --vocab-file /home/work/open_x_dataset/LAPA/lapa_checkpoints/tokenizer.model \
     --tokens-per-action 7 --tokens-per-delta 4
 
 # CUDA_VISIBLE_DEVICES=${gpu_id} python simpler_env/main_inference_lapa.py --policy-model ${policy_model} --ckpt-path ${ckpt_path} \
